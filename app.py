@@ -25,19 +25,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 核心逻辑类 (云端版 - 无代理)
+# 2. 核心逻辑类 (Kraken 版 - 美国IP可用)
 # ==========================================
 class SniperBrain:
     def __init__(self):
-        # 🔥 修改点：删除了 proxies 部分
-        # Streamlit Cloud 服务器在美国，可以直接连接 Bybit
-        self.exchange = ccxt.bybit({
-            'enableRateLimit': True, 
-            'options': {'defaultType': 'linear'}
+        # 🔥 修改点：换成 Kraken 交易所
+        # Kraken 允许美国 IP 访问，Streamlit Cloud 可以连接
+        self.exchange = ccxt.kraken({
+            'enableRateLimit': True
         })
     
     def fetch_candles(self, symbol, timeframe, limit=100):
         try:
+            # Kraken 的数据获取逻辑
             ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
             
             if not ohlcv:
@@ -58,6 +58,7 @@ class SniperBrain:
         try:
             df[f'EMA_{ema_period}'] = df['close'].ewm(span=ema_period, adjust=False).mean()
             
+            # ATR 计算
             df['tr0'] = abs(df['high'] - df['low'])
             df['tr1'] = abs(df['high'] - df['close'].shift())
             df['tr2'] = abs(df['low'] - df['close'].shift())
@@ -73,29 +74,29 @@ class SniperBrain:
 # ==========================================
 with st.sidebar:
     st.title("🦅 FTMO 狙击手")
-    st.caption("☁️ 云端监控版")
-    st.success("✅ 服务器状态: 在线 (无需代理)")
+    st.caption("☁️ 云端兼容版 (Kraken)")
+    st.success("✅ 数据源: Kraken (US Compatible)")
     st.divider()
     
-    symbol = st.selectbox("交易标的", ["ETH/USDT", "BTC/USDT", "SOL/USDT"])
+    # Kraken 的交易对名称通常是 ETH/USD 而不是 USDT
+    symbol = st.selectbox("交易标的", ["ETH/USD", "BTC/USD", "SOL/USD"])
     refresh_btn = st.button("🔄 刷新行情", type="primary")
 
 # ==========================================
 # 4. 主程序
 # ==========================================
 
-# 自动运行
 if True:
     brain = SniperBrain()
     
     status_text = st.empty()
-    status_text.info(f"📡 正在从云端连接 Bybit 获取 {symbol} 数据...")
+    status_text.info(f"📡 正在连接 Kraken 获取 {symbol} 数据...")
     
     # --- 1. 获取日线 ---
     df_daily = brain.fetch_candles(symbol, '1d', limit=100)
     
     if df_daily is None:
-        status_text.error("💀 致命错误：无法获取日线数据。可能 Bybit 接口波动，请稍后刷新。")
+        status_text.error("💀 错误：无法获取数据。可能 Kraken 接口繁忙，请稍后刷新。")
         st.stop()
         
     df_daily = brain.calculate_indicators(df_daily, 50)
@@ -104,7 +105,7 @@ if True:
     df_4h = brain.fetch_candles(symbol, '4h', limit=100)
     
     if df_4h is None:
-        status_text.error("💀 致命错误：日线成功，但 4H 线获取失败。")
+        status_text.error("💀 错误：日线成功，但 4H 线获取失败。")
         st.stop()
         
     df_4h = brain.calculate_indicators(df_4h, 20)
@@ -143,4 +144,4 @@ if True:
     st.plotly_chart(fig, use_container_width=True)
     
     # 策略建议
-    st.info(f"💡 策略状态: 日线趋势 {'向上' if is_bullish else '向下'} | 4H 距离 EMA20 {dist_pct:.2f}%")
+    st.info(f"💡 数据源已切换至 Kraken (以兼容云端网络)。策略状态: 日线趋势 {'向上' if is_bullish else '向下'} | 4H 距离 EMA20 {dist_pct:.2f}%")
